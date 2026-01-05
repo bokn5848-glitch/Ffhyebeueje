@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>💬 UChat Offline</title>
+
+<style>
+body{margin:0;font-family:Arial;background:#f2f2f2}
+header{background:#4a90e2;color:#fff;padding:12px;display:flex;justify-content:space-between;align-items:center}
+#logout{background:#ff4d4d;color:#fff;border:none;padding:6px 10px;border-radius:6px}
+
+#chat{height:calc(100vh - 200px);overflow-y:auto;padding:10px}
+.msg{background:#fff;padding:8px 10px;margin:6px 0;border-radius:14px;max-width:70%;position:relative}
+.me{background:#d9ecff;margin-left:auto}
+.name{font-weight:bold;color:#4a90e2;font-size:13px}
+.time{font-size:11px;color:#888;text-align:right}
+.action{font-size:12px;color:#4a90e2;cursor:pointer;text-align:right}
+.recall{font-style:italic;color:#999}
+
+.reactions span{
+  cursor:pointer;
+  margin-right:8px;
+  font-size:20px;
+}
+
+#inputBox{padding:10px;background:#fff;display:flex;gap:5px}
+input{flex:1;padding:10px;font-size:16px}
+button{padding:10px;font-size:16px}
+
+#loginBox{text-align:center;padding:30px}
+</style>
+</head>
+
+<body>
+
+<header>
+<span>💬 <b>UChat Offline</b></span>
+<button id="logout" onclick="logout()">🚪 Thoát</button>
+</header>
+
+<div id="loginBox">
+<input id="username" placeholder="👤 Nhập tên"><br><br>
+<button onclick="login()">➡️ Vào chat</button>
+</div>
+
+<div id="chat" style="display:none"></div>
+
+<div id="inputBox" style="display:none">
+<input id="text" placeholder="✍️ Nhập tin nhắn...">
+<button onclick="send()">📤</button>
+</div>
+
+<script>
+let user="";
+let lastSend=0;
+let messages=JSON.parse(localStorage.getItem("chat_data")||"[]");
+
+const chat=document.getElementById("chat");
+
+if(localStorage.chat_user){
+  user=localStorage.chat_user;
+  start();
+}
+
+function login(){
+  user=username.value.trim();
+  if(!user) return alert("Nhập tên");
+  localStorage.chat_user=user;
+  start();
+}
+
+function start(){
+  loginBox.style.display="none";
+  chat.style.display="block";
+  inputBox.style.display="flex";
+  render();
+}
+
+function logout(){
+  localStorage.removeItem("chat_user");
+  location.reload();
+}
+
+function save(){
+  localStorage.setItem("chat_data",JSON.stringify(messages));
+}
+
+function send(){
+  if(Date.now()-lastSend<1000) return alert("⏳ Gửi chậm lại");
+  lastSend=Date.now();
+
+  const t=text.value.trim();
+  if(!t) return;
+
+  messages.push({
+    id:Date.now(),
+    name:user,
+    msg:t,
+    time:new Date().toLocaleTimeString(),
+    recall:false,
+    react:{
+      "😀":0,
+      "😍":0,
+      "🖐":0,
+      "😇":0,
+      "😡":0
+    }
+  });
+  save();
+  text.value="";
+  render();
+}
+
+function render(){
+  chat.innerHTML="";
+  messages.forEach(m=>{
+    const div=document.createElement("div");
+    div.className="msg"+(m.name===user?" me":"");
+    div.innerHTML=`
+      <div class="name">👤 ${m.name}</div>
+      <div>${m.recall ? '<span class="recall">♻️ Tin nhắn đã bị thu hồi</span>' : m.msg}</div>
+
+      <div class="reactions">
+        <span onclick="react(${m.id},'😀')">😀 ${m.react["😀"]||0}</span>
+        <span onclick="react(${m.id},'😍')">😍 ${m.react["😍"]||0}</span>
+        <span onclick="react(${m.id},'🖐')">🖐 ${m.react["🖐"]||0}</span>
+        <span onclick="react(${m.id},'😇')">😇 ${m.react["😇"]||0}</span>
+        <span onclick="react(${m.id},'😡')">😡 ${m.react["😡"]||0}</span>
+      </div>
+
+      <div class="time">🕒 ${m.time}</div>
+
+      ${m.name===user ? `
+        <div class="action" onclick="editMsg(${m.id})">✏️ Sửa</div>
+        <div class="action" onclick="recallMsg(${m.id})">♻️ Thu hồi</div>
+      ` : ""}
+    `;
+    chat.appendChild(div);
+  });
+  chat.scrollTop=chat.scrollHeight;
+}
+
+function editMsg(id){
+  const m=messages.find(x=>x.id===id);
+  const n=prompt("✏️ Sửa tin nhắn:",m.msg);
+  if(n){
+    m.msg=n+" (đã sửa)";
+    save();render();
+  }
+}
+
+function recallMsg(id){
+  const m=messages.find(x=>x.id===id);
+  if(confirm("♻️ Thu hồi tin nhắn?")){
+    m.recall=true;
+    save();render();
+  }
+}
+
+function react(id,emoji){
+  const m=messages.find(x=>x.id===id);
+  m.react[emoji]=(m.react[emoji]||0)+1;
+  save();render();
+}
+</script>
+
+</body>
+</html>
