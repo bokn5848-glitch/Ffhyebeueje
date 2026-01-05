@@ -11,18 +11,29 @@ header{background:#4a90e2;color:#fff;padding:12px;display:flex;justify-content:s
 #logout{background:#ff4d4d;color:#fff;border:none;padding:6px 10px;border-radius:6px}
 
 #chat{height:calc(100vh - 200px);overflow-y:auto;padding:10px}
-.msg{background:#fff;padding:8px 10px;margin:6px 0;border-radius:14px;max-width:70%;position:relative}
+.msg{background:#fff;padding:10px;margin:6px 0;border-radius:14px;max-width:70%;position:relative}
 .me{background:#d9ecff;margin-left:auto}
-.name{font-weight:bold;color:#4a90e2;font-size:13px}
+.name{font-size:13px;color:#4a90e2;font-weight:bold}
 .time{font-size:11px;color:#888;text-align:right}
-.action{font-size:12px;color:#4a90e2;cursor:pointer;text-align:right}
+.action{font-size:12px;color:#4a90e2;cursor:pointer}
 .recall{font-style:italic;color:#999}
 
-.reactions span{
-  cursor:pointer;
-  margin-right:8px;
-  font-size:20px;
+.reactions{margin-top:4px;font-size:18px}
+.reactions span{margin-right:6px}
+
+.reactionBox{
+  position:absolute;
+  bottom:100%;
+  left:10px;
+  background:#fff;
+  border-radius:30px;
+  padding:6px 10px;
+  box-shadow:0 4px 12px rgba(0,0,0,.3);
+  display:none;
+  gap:10px;
+  z-index:99;
 }
+.reactionBox span{font-size:22px;cursor:pointer}
 
 #inputBox{padding:10px;background:#fff;display:flex;gap:5px}
 input{flex:1;padding:10px;font-size:16px}
@@ -35,27 +46,25 @@ button{padding:10px;font-size:16px}
 <body>
 
 <header>
-<span>💬 <b>UChat Offline</b></span>
-<button id="logout" onclick="logout()">🚪 Thoát</button>
+💬 <b>UChat Offline</b>
+<button id="logout" onclick="logout()">🚪</button>
 </header>
 
 <div id="loginBox">
 <input id="username" placeholder="👤 Nhập tên"><br><br>
-<button onclick="login()">➡️ Vào chat</button>
+<button onclick="login()">Vào chat</button>
 </div>
 
 <div id="chat" style="display:none"></div>
 
 <div id="inputBox" style="display:none">
-<input id="text" placeholder="✍️ Nhập tin nhắn...">
+<input id="text" placeholder="✍️ Nhập tin nhắn">
 <button onclick="send()">📤</button>
 </div>
 
 <script>
 let user="";
-let lastSend=0;
 let messages=JSON.parse(localStorage.getItem("chat_data")||"[]");
-
 const chat=document.getElementById("chat");
 
 if(localStorage.chat_user){
@@ -78,7 +87,7 @@ function start(){
 }
 
 function logout(){
-  localStorage.removeItem("chat_user");
+  localStorage.clear();
   location.reload();
 }
 
@@ -87,29 +96,18 @@ function save(){
 }
 
 function send(){
-  if(Date.now()-lastSend<1000) return alert("⏳ Gửi chậm lại");
-  lastSend=Date.now();
-
   const t=text.value.trim();
   if(!t) return;
-
   messages.push({
     id:Date.now(),
     name:user,
     msg:t,
     time:new Date().toLocaleTimeString(),
     recall:false,
-    react:{
-      "😀":0,
-      "😍":0,
-      "🖐":0,
-      "😇":0,
-      "😡":0
-    }
+    react:{}
   });
-  save();
   text.value="";
-  render();
+  save();render();
 }
 
 function render(){
@@ -117,51 +115,62 @@ function render(){
   messages.forEach(m=>{
     const div=document.createElement("div");
     div.className="msg"+(m.name===user?" me":"");
-    div.innerHTML=`
-      <div class="name">👤 ${m.name}</div>
-      <div>${m.recall ? '<span class="recall">♻️ Tin nhắn đã bị thu hồi</span>' : m.msg}</div>
+    div.onclick=()=>toggleReactBox(m.id);
 
-      <div class="reactions">
-        <span onclick="react(${m.id},'😀')">😀 ${m.react["😀"]||0}</span>
-        <span onclick="react(${m.id},'😍')">😍 ${m.react["😍"]||0}</span>
-        <span onclick="react(${m.id},'🖐')">🖐 ${m.react["🖐"]||0}</span>
-        <span onclick="react(${m.id},'😇')">😇 ${m.react["😇"]||0}</span>
-        <span onclick="react(${m.id},'😡')">😡 ${m.react["😡"]||0}</span>
+    div.innerHTML=`
+      <div class="reactionBox" id="box${m.id}">
+        <span onclick="addReact(event,${m.id},'😀')">😀</span>
+        <span onclick="addReact(event,${m.id},'😍')">😍</span>
+        <span onclick="addReact(event,${m.id},'❤️')">❤️</span>
+        <span onclick="addReact(event,${m.id},'👍')">👍</span>
+        <span onclick="addReact(event,${m.id},'🖐')">🖐</span>
+        <span onclick="addReact(event,${m.id},'😇')">😇</span>
+        <span onclick="addReact(event,${m.id},'😡')">😡</span>
       </div>
 
-      <div class="time">🕒 ${m.time}</div>
+      <div class="name">${m.name}</div>
+      <div>${m.recall?'<span class="recall">Tin nhắn đã thu hồi</span>':m.msg}</div>
 
-      ${m.name===user ? `
-        <div class="action" onclick="editMsg(${m.id})">✏️ Sửa</div>
-        <div class="action" onclick="recallMsg(${m.id})">♻️ Thu hồi</div>
-      ` : ""}
+      <div class="reactions">
+        ${Object.keys(m.react).map(e=>`${e} ${m.react[e]}`).join(" ")}
+      </div>
+
+      <div class="time">${m.time}</div>
+
+      ${m.name===user?`
+        <div class="action" onclick="editMsg(event,${m.id})">✏️ Sửa</div>
+        <div class="action" onclick="recallMsg(event,${m.id})">♻️ Thu hồi</div>
+      `:""}
     `;
     chat.appendChild(div);
   });
   chat.scrollTop=chat.scrollHeight;
 }
 
-function editMsg(id){
-  const m=messages.find(x=>x.id===id);
-  const n=prompt("✏️ Sửa tin nhắn:",m.msg);
-  if(n){
-    m.msg=n+" (đã sửa)";
-    save();render();
-  }
+function toggleReactBox(id){
+  document.querySelectorAll(".reactionBox").forEach(b=>b.style.display="none");
+  const box=document.getElementById("box"+id);
+  box.style.display="flex";
 }
 
-function recallMsg(id){
-  const m=messages.find(x=>x.id===id);
-  if(confirm("♻️ Thu hồi tin nhắn?")){
-    m.recall=true;
-    save();render();
-  }
-}
-
-function react(id,emoji){
+function addReact(e,id,emoji){
+  e.stopPropagation();
   const m=messages.find(x=>x.id===id);
   m.react[emoji]=(m.react[emoji]||0)+1;
   save();render();
+}
+
+function editMsg(e,id){
+  e.stopPropagation();
+  const m=messages.find(x=>x.id===id);
+  const n=prompt("Sửa:",m.msg);
+  if(n){m.msg=n+" (đã sửa)";save();render();}
+}
+
+function recallMsg(e,id){
+  e.stopPropagation();
+  const m=messages.find(x=>x.id===id);
+  if(confirm("Thu hồi?")){m.recall=true;save();render();}
 }
 </script>
 
